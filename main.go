@@ -21,24 +21,28 @@ type WorkItem struct {
 }
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	http.Handle("/views/", http.StripPrefix("/views/", http.FileServer(http.Dir("../views/"))))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	http.HandleFunc("/", Index)
 	http.HandleFunc("/create", WorkItemCreate)
 	http.HandleFunc("/edit", WorkItemEdit)
 	http.HandleFunc("/update", WorkItemUpdate)
-	http.ListenAndServe(":"+port, nil)
+	// Webサーバ起動
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		fmt.Printf("Error starting server: %s\n", err)
+		os.Exit(1)
+	}
 }
 
 func dbConn() (*datastore.Client, error) {
 	// Datastore用のコンテキストとクライアントを作成する
 	ctx := context.Background()
 
-	projectId := os.Getenv("DATASTORE_PROJECT_ID")
+	projectId := os.Getenv("GOOGLE_CLOUD_PROJECT")
 
 	client, err := datastore.NewClient(ctx, projectId)
 	if err != nil {
@@ -48,7 +52,7 @@ func dbConn() (*datastore.Client, error) {
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("../templates/index.html")
+	tmpl, err := template.ParseFiles("templates/index.html")
 	if err != nil {
 		http.Error(w, "Could not connect to index.html", http.StatusNotFound)
 	}
@@ -68,6 +72,10 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Data stored in datastore cannot be retrieved: %v", err), http.StatusInternalServerError)
 		return
+	}
+
+	if len(records) == 0 {
+		records = append(records, WorkItem{})
 	}
 
 	loc, _ := time.LoadLocation("Asia/Tokyo")
@@ -142,7 +150,7 @@ func WorkItemEdit(w http.ResponseWriter, r *http.Request) {
 	loc, _ := time.LoadLocation("Asia/Tokyo")
 	EditRecord.WorkdateTime = EditRecord.WorkdateTime.In(loc)
 
-	tmpl, err := template.ParseFiles("../templates/edit.html")
+	tmpl, err := template.ParseFiles("templates/edit.html")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to parse edit.html: %b", err), http.StatusInternalServerError)
 		return
@@ -152,7 +160,7 @@ func WorkItemEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 func WorkItemUpdate(w http.ResponseWriter, r *http.Request) {
-	_, err := template.ParseFiles("../templates/edit.html")
+	_, err := template.ParseFiles("templates/edit.html")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not connect to edit.html: %v", err), http.StatusInternalServerError)
 		return
